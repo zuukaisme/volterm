@@ -1,0 +1,39 @@
+{
+  "name": "volterm",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@next/swc-wasm-nodejs": "^16.3.5",
+    "clsx": "^2.1.1",
+    "dexie": "^4.4.6",
+    "dexie-react-hooks": "^4.4.0",
+    "lightweight-charts": "^5.1.0",
+    "lucide-react": "^0.560.0",
+    "next": "^16.3.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^16.3.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
