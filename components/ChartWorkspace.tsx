@@ -21,6 +21,7 @@ import { TradeDetail } from "@/components/ledger/TradeDetail";
 import { Modal } from "@/components/ui/Modal";
 import { SymbolSearch } from "@/components/market/SymbolSearch";
 import { Watchlist } from "@/components/market/Watchlist";
+import { TickerTape } from "@/components/market/TickerTape";
 import { DesktopSidebar } from "@/components/layout/DesktopSidebar";
 import { MobileToolbar } from "@/components/layout/MobileToolbar";
 import { BottomSheet } from "@/components/layout/BottomSheet";
@@ -205,6 +206,13 @@ export function ChartWorkspace({
           connectionState={connectionState}
           onOpenSearch={() => setMobileSheet("search")}
         />
+        <TickerTape
+          symbols={watchlist.symbols}
+          prices={watchlist.prices}
+          instrumentsBySymbol={instrumentsBySymbol}
+          selectedSymbol={selectedSymbol}
+          onSelect={setSelectedSymbol}
+        />
         <TimeframeSelector value={timeframeId} onChange={setTimeframeId} />
 
         <div className="hidden md:block">
@@ -230,7 +238,13 @@ export function ChartWorkspace({
             drawings={drawings}
             tradeMarkers={tradeMarkers}
             onTradeMarkerClick={handleMarkerClick}
+            onToggleIndicator={handleToggleIndicator}
             onPlaceDrawing={handlePlaceDrawing}
+            title={selectedInstrument?.displayName ?? selectedSymbol ?? ""}
+            daily={["1D", "4D", "1W", "1M"].includes(timeframeId)}
+            sessionChange={priceSnapshot.change}
+            sessionChangePercent={priceSnapshot.changePercent}
+            pipSize={selectedInstrument?.pipSize ?? 2}
           />
 
           {selectedSymbol ? (

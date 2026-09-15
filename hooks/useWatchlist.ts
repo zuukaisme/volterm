@@ -13,6 +13,7 @@ export function useWatchlist() {
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
   const subscriptionsRef = useRef(new Map<string, { unsubscribe: () => void }>());
   const hydratedRef = useRef(false);
+  const firstPriceRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     setSymbols(loadWatchlist());
@@ -45,12 +46,18 @@ export function useWatchlist() {
       }, 400);
 
       const subscription = provider.subscribeTicks(symbol, (tick) => {
+        if (firstPriceRef.current[symbol] === undefined) {
+          firstPriceRef.current[symbol] = tick.quote;
+        }
+        const first = firstPriceRef.current[symbol];
+        const change = tick.quote - first;
+        const changePercent = first !== 0 ? (change / first) * 100 : 0;
         throttledUpdate({
           symbol,
           price: tick.quote,
-          previousClose: null,
-          change: null,
-          changePercent: null,
+          previousClose: first,
+          change,
+          changePercent,
           lastUpdate: tick.epoch,
           connected: true,
         });

@@ -3,8 +3,8 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  Home,
   CandlestickChart,
+  LayoutDashboard,
   BookOpen,
   LayoutGrid,
   NotebookPen,
@@ -13,12 +13,17 @@ import {
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" },
   {
     href: "/chart",
     label: "Charts",
     icon: CandlestickChart,
     match: (p: string) => p === "/chart",
+  },
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    match: (p: string) => p.startsWith("/dashboard"),
   },
   {
     href: "/ledger",

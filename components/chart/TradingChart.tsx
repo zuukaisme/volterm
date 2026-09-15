@@ -39,9 +39,11 @@ import type {
   Drawing,
   DrawingPoint,
   DrawingToolId,
+  IndicatorId,
   IndicatorState,
 } from "@/types/chart";
 import type { CandleStreamHandle } from "@/hooks/useCandles";
+import { ChartOverlay, type LegendCandle } from "./ChartOverlay";
 
 const UP_COLOR = "#2fd98a";
 const DOWN_COLOR = "#f0555a";
@@ -135,7 +137,13 @@ export type TradingChartProps = {
   drawings: Drawing[];
   tradeMarkers?: ChartTradeMarker[];
   onTradeMarkerClick?: (tradeId: string) => void;
+  onToggleIndicator?: (id: IndicatorId, next: boolean) => void;
   onPlaceDrawing: (tool: DrawingToolId, points: DrawingPoint[]) => void;
+  title?: string;
+  daily?: boolean;
+  sessionChange?: number | null;
+  sessionChangePercent?: number | null;
+  pipSize?: number;
 };
 
 function toUTC(time: number): UTCTimestamp {
@@ -214,6 +222,24 @@ function toLinePoint(point: IndicatorPoint) {
   return { time: toUTC(point.time), value: point.value };
 }
 
+function candleToLegend(candle: Candle, snapshot: Candle[]): LegendCandle {
+  let prevClose: number | null = null;
+  for (let index = snapshot.length - 1; index >= 0; index -= 1) {
+    if (snapshot[index].time < candle.time) {
+      prevClose = snapshot[index].close;
+      break;
+    }
+  }
+  return {
+    time: candle.time,
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close,
+    prevClose,
+  };
+}
+
 function computeSubPaneAssignments(indicators: IndicatorState) {
   let nextPane = 1;
   const assignment: { rsi: number | null; macd: number | null } = {
@@ -238,7 +264,13 @@ export function TradingChart({
   drawings,
   tradeMarkers = [],
   onTradeMarkerClick,
+  onToggleIndicator,
   onPlaceDrawing,
+  title = "",
+  daily = false,
+  sessionChange = null,
+  sessionChangePercent = null,
+  pipSize = 2,
 }: TradingChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -257,6 +289,10 @@ export function TradingChart({
     null
   );
   const lastDragPointRef = useRef<{ x: number; y: number } | null>(null);
+  const lastCandleRef = useRef<Candle | null>(null);
+  const hoverRef = useRef(false);
+  const [legend, setLegend] = useState<LegendCandle | null>(null);
+  const [hovering, setHovering] = useState(false);
   const [, bumpOverlayVersion] = useState(0);
   const { theme } = useTheme();
 
@@ -281,6 +317,18 @@ export function TradingChart({
   useEffect(() => {
     onPlaceDrawingRef.current = onPlaceDrawing;
   }, [onPlaceDrawing]);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      pendingPointRef.current = null;
+      dragRef.current = null;
+      lastDragPointRef.current = null;
+      scheduleOverlayRedraw();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [scheduleOverlayRedraw]);
 
   useEffect(() => {
     scheduleOverlayRedraw();
@@ -410,6 +458,51 @@ export function TradingChart({
     const handleRangeChange = () => scheduleOverlayRedraw();
     chart.timeScale().subscribeVisibleLogicalRangeChange(handleRangeChange);
 
+    const handleCrosshairMove = (param: MouseEventParams) => {
+      const series = mainSeriesRef.current;
+      if (!series) return;
+      if (param.time !== undefined) {
+        const data = param.seriesData.get(series) as
+          | { open: number; high: number; low: number; close: number }
+          | { value: number }
+          | undefined;
+        let next: LegendCandle | null = null;
+        if (data && "close" in data) {
+          next = {
+            time: timeToEpoch(param.time),
+            open: data.open,
+            high: data.high,
+            low: data.low,
+            close: data.close,
+            prevClose: null,
+          };
+        } else if (data && "value" in data) {
+          next = {
+            time: timeToEpoch(param.time),
+            open: data.value,
+            high: data.value,
+            low: data.value,
+            close: data.value,
+            prevClose: null,
+          };
+        }
+        if (next) {
+          const snapshot = streamHandle.getSnapshot();
+          const index = snapshot.findIndex((candle) => candle.time === next?.time);
+          next = { ...next, prevClose: index > 0 ? snapshot[index - 1].close : null };
+        }
+        hoverRef.current = true;
+        setHovering(true);
+        setLegend(next);
+      } else {
+        hoverRef.current = false;
+        setHovering(false);
+        const last = lastCandleRef.current;
+        setLegend(last ? candleToLegend(last, streamHandle.getSnapshot()) : null);
+      }
+    };
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+
     const resizeObserver = new ResizeObserver(() => scheduleOverlayRedraw());
     resizeObserver.observe(container);
 
@@ -518,6 +611,7 @@ export function TradingChart({
       resizeObserver.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleRangeChange);
       chart.unsubscribeClick(handleClick);
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
       chart.remove();
       chartRef.current = null;
       mainSeriesRef.current = null;
@@ -796,6 +890,10 @@ export function TradingChart({
       }
       activitySeriesRef.current?.setData(mapActivityData(candles));
       applyFullIndicatorData(candles);
+      lastCandleRef.current = candles[candles.length - 1] ?? null;
+      if (!hoverRef.current) {
+        setLegend(lastCandleRef.current ? candleToLegend(lastCandleRef.current, candles) : null);
+      }
       scheduleOverlayRedraw();
     };
 
@@ -818,6 +916,13 @@ export function TradingChart({
       }
       activitySeriesRef.current?.update(mapActivityPoint(event.candle));
       applyIncrementalIndicatorData(streamHandle.getSnapshot());
+
+      if (event.candle.time >= (lastCandleRef.current?.time ?? -1)) {
+        lastCandleRef.current = event.candle;
+      }
+      if (!hoverRef.current) {
+        setLegend(event.candle ? candleToLegend(event.candle, streamHandle.getSnapshot()) : null);
+      }
     });
 
     const initialSnapshot = streamHandle.getSnapshot();
@@ -966,6 +1071,20 @@ export function TradingChart({
       <svg className="pointer-events-none absolute inset-0 h-full w-full">
         {renderDrawings()}
       </svg>
+      <ChartOverlay
+        title={title}
+        chartType={chartType}
+        legend={legend}
+        hovering={hovering}
+        sessionChange={sessionChange}
+        sessionChangePercent={sessionChangePercent}
+        pipSize={pipSize}
+        daily={daily}
+        indicators={indicators}
+        onToggleIndicator={onToggleIndicator ?? (() => undefined)}
+        onFitContent={() => chartRef.current?.timeScale().fitContent()}
+        onGoToLatest={() => chartRef.current?.timeScale().scrollToRealTime()}
+      />
     </div>
   );
 }
