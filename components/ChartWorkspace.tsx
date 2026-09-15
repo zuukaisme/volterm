@@ -342,6 +342,7 @@ export function ChartWorkspace({
         open={showTradeForm}
         onClose={() => { setShowTradeForm(false); setEditingTrade(undefined); setTradePrefill(null); }}
         size="full"
+        noPadding
         title={editingTrade ? "Edit Trade" : "Record Trade"}
       >
         <TradeForm
@@ -357,6 +358,7 @@ export function ChartWorkspace({
         open={viewingTrade !== null}
         onClose={() => setViewingTrade(null)}
         size="full"
+        noPadding
         title="Trade Details"
       >
         {viewingTrade && (
